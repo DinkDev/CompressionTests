@@ -1,0 +1,18 @@
+{
+    "Document": [
+        {
+            "Id": 21,
+            "IsDeleted": false,
+            "RecordStatus": "Completed",
+            "ProcessingStartedDate": "2021-06-22T08:32:11.0154184",
+            "ProcessingCompletedDate": "2021-06-22T08:33:40.6049953",
+            "FileName": "13060495.2013-12-12.HP49ZKJ2PXXIFW3.IDS",
+            "DocumentPackageId": 42,
+            "DocumentCode": "IDS",
+            "DocumentKeyId": "HP49ZKJ2PXXIFW3",
+            "MailRoomDate": "12\/12\/2013",
+            "TotalPageQuantity": "4",
+            "DocumentTypeTransformProcessDocumentType": "IDS"
+        }
+    ]
+}

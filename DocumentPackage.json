@@ -1,0 +1,24 @@
+{
+    "DocumentPackage": [
+        {
+            "Id": 42,
+            "IsDeleted": false,
+            "RecordStatus": "Completed",
+            "ApplicationNumber": "13060495",
+            "LastErroredDate": "2021-06-22T08:33:40.8179739",
+            "LastError": "Test : Package 13060495 competed - sent to Out queue",
+            "DocumentBundleReceivedId": 33,
+            "AcceptedDate": "2021-04-08T08:38:46.9149728",
+            "ReceivedDate": "2021-04-08T08:38:44.4823004",
+            "ReceivedFileChecksum": 489767400,
+            "ReceivedFileName": "13060495.zip",
+
+            "ReturnedDate": "2021-06-24T09:00:00.0000001",
+            "ReturnedFileChecksum": 0,
+            "ReturnedFileName": "13060495.zip",
+
+            "TransferredDate": "2020-11-18T09:05:43.9489893",
+            "MessageCode": "OK"
+        }
+    ]
+}
