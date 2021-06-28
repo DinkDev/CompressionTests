@@ -11,9 +11,25 @@
     internal class RefactoredCompleteServerStub
     {
         // just for the nameof reference
-        public class CompleteServer { } 
+        public class CompleteServer { }
+        public FileSystemHelperStub FileSystemHelper { get; } = new FileSystemHelperStub();
+
+        private readonly UowStub _uowStub;
+        public UowStub UnitOfWorkFactory()
+        {
+            return _uowStub;
+        }
+        public SettingsStub Settings { get; } = new SettingsStub();
+
+        private DocumentBundleReturned DocumentBundleReturnedFactory()
+        {
+            return UowStub.BundleReturnedRepoStub.Bundle;
+        }
+
 
         public CancellationToken CancelToken { get; }
+
+        public CrcStub ChecksumHelper { get; } = new CrcStub();
 
         public RefactoredCompleteServerStub(CancellationToken cancelToken, Action started)
         {
@@ -23,26 +39,12 @@
             _uowStub.Started += started;
         }
 
-        public SettingsStub Settings { get; } = new SettingsStub();
+
+        // TODO: keep below, starting here:
 
         public ILogger Logger { get; set; }
         public Func<DateTime> CurrentDateTime { get; set; } = () => DateTime.Now;
-
         public DateTime LastProcessTime { get; set; }
-
-        private readonly UowStub _uowStub;
-        public UowStub UnitOfWorkFactory()
-        {
-            return _uowStub;
-        }
-
-        private DocumentBundleReturned DocumentBundleReturnedFactory()
-        {
-            return UowStub.BundleReturnedRepoStub.Bundle;
-        }
-
-        public CrcStub ChecksumHelper { get; } = new CrcStub();
-
 
         public async Task ExecuteAsync()
         {
@@ -320,20 +322,8 @@
             return newBundle;
         }
 
-        private bool BundleLimit(DocumentBundleReturned currentBundle, int packageReturnedFileSize)
-        {
-            return true;
-        }
 
-        private async Task WritePackageWorkFileAsync(DocumentPackage package, byte[] packageBytes)
-        {
-            await Task.FromResult(0);
-        }
 
-        //public async Task<bool> WriteBundleOutFileAsync(DocumentBundleReturned bundle)
-        //{
-        //    return await Task.FromResult(true);
-        //}
 
         public async Task<bool> WriteBundleOutFileAsync(DocumentBundleReturned bundle)
         {
@@ -419,15 +409,13 @@
             }
         }
 
-        public FileSystemHelperStub FileSystemHelper { get; } = new FileSystemHelperStub();
-
         public async Task<bool> ZipPackageAsync(DocumentPackage package)
         {
             var rv = false;
 
-            var zipData = ZipPackage_DocumentPart(package);
+            var zipData = GetPackageFilesForZip(package);
 
-            var packageBytes = await ZipPackage_ZipPartAsync(zipData);
+            var packageBytes = await CompressedFileHelper_GetZipBytes(zipData);
             if (packageBytes.Length > 0)
             {
                 package.ReturnedFileSize = Convert.ToInt32(packageBytes.Length);
@@ -442,7 +430,7 @@
             return rv;
         }
 
-        public IEnumerable<CompressedEntry> ZipPackage_DocumentPart(DocumentPackage package)
+        public IEnumerable<CompressedEntry> GetPackageFilesForZip(DocumentPackage package)
         {
             var rv = new List<CompressedEntry>();
 
@@ -489,7 +477,7 @@
             return rv;
         }
 
-        public async Task<byte[]> ZipPackage_ZipPartAsync(IEnumerable<CompressedEntry> zipDataList)
+        public async Task<byte[]> CompressedFileHelper_GetZipBytes(IEnumerable<CompressedEntry> zipDataList)
         {
             var outStream = new MemoryStream();
             using (var zipStream = new ZipOutputStream(outStream))
@@ -529,16 +517,24 @@
 
         public void TarPackages(string sourceDir, string targetFileName)
         {
-            using (var outStream = new FileStream(targetFileName, FileMode.Create))
+            var zipFiles = FileSystemHelper.GetFilesRecursive(sourceDir, "*.ZIP");
+            CompressedFileHelper_CreateTarFromFileList(targetFileName, zipFiles);
+
+            Logger.LogTrace($"Created Tar: {targetFileName} at {CurrentDateTime()}");
+            FileSystemHelper.CleanUp(sourceDir);
+        }
+
+        private void CompressedFileHelper_CreateTarFromFileList(string tarFileName, IEnumerable<string> files)
+        {
+            using (var outStream = new FileStream(tarFileName, FileMode.Create))
             {
                 using (var tarStream = new TarOutputStream(outStream))
                 {
-                    var zipFiles = FileSystemHelper.GetFilesRecursive(sourceDir, "*.ZIP");
-                    foreach (var zip in zipFiles)
+                    foreach (var file in files)
                     {
-                        using (var inputStream = File.OpenRead(zip))
+                        using (var inputStream = File.OpenRead(file))
                         {
-                            var tarName = FileSystemHelper.GetFileName(zip);
+                            var tarName = FileSystemHelper.GetFileName(file);
                             var fileSize = inputStream.Length;
                             var tarEntry = TarEntry.CreateTarEntry(tarName);
                             tarEntry.Size = fileSize;
@@ -565,15 +561,11 @@
 
                 outStream.Close();
             }
-
-            Logger.LogTrace($"Created Tar: {targetFileName} at {CurrentDateTime()}");
-            FileSystemHelper.CleanUp(sourceDir);
         }
 
-        public string ReplaceUnderscoreWith2E(string instr)
+        public string ReplaceUnderscoreWith2E(string fileName)
         {
-            var ret = instr.Replace("_", "+2e");
-            return ret;
+            return fileName.Replace("_", "+2e");
         }
 
         public string GetPackageOutFile(DocumentPackage package)
@@ -581,7 +573,6 @@
             return FileSystemHelper.CombinePath(Settings.OutputDirectory,
                 $"{package.PackageName}.{ReplaceUnderscoreWith2E(package.DocumentBundleReceived.BundleName)}{Settings.PackageFileExtension}");
         }
-
 
         public void SetBundleTempFile(DocumentBundleReturned bundle)
         {
@@ -600,6 +591,20 @@
                     bundle.Id + Settings.BundleFileExtension);
             }
         }
+
+        #region Noops
+
+        private bool BundleLimit(DocumentBundleReturned currentBundle, int packageReturnedFileSize)
+        {
+            return true;
+        }
+
+        private async Task WritePackageWorkFileAsync(DocumentPackage package, byte[] packageBytes)
+        {
+            await Task.FromResult(0);
+        }
+
+        #endregion
     }
 
     internal class CompressedEntry
