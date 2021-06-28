@@ -1,0 +1,34 @@
+﻿OriginalCompleteServerTest1: Trace: CompleteServer.ExecuteAsync - Starting at 6/28/2021 1:00:00 AM
+OriginalCompleteServerTest1: Information: Processing starting - bundle: 1CLM1IDS, package: 13060495, application number: 13060495, Documents: HP49ZKJ2PXXIFW3
+OriginalCompleteServerTest1: Debug: CompleteServer.ProcessOutQueuePackagesAsync: Starting bundle ID: 33, Timeout: 6/28/2021 1:05:00 AM
+OriginalCompleteServerTest1: Information: Validated package 13060495
+OriginalCompleteServerTest1: Information: MemoryStream: Close - start data dump.
+OriginalCompleteServerTest1: Information: TarStream:
+OriginalCompleteServerTest1: Information: ZipStream:
+OriginalCompleteServerTest1: Information: SetLevel: 3
+OriginalCompleteServerTest1: Information: PutNextEntry: ZipEntry: 13060495.2013-12-12.HP49ZKJ2PXXIFW3\13060495.2013-12-12.HP49ZKJ2PXXIFW3.XML, 6/28/2021 1:00:00 AM, 65
+OriginalCompleteServerTest1: Information: Write: Contents from 13060495.2013-12-12.HP49ZKJ2PXXIFW3_Transformed.xml, 0, 65
+OriginalCompleteServerTest1: Information: CloseEntry
+OriginalCompleteServerTest1: Information: IsStreamOwner: False
+OriginalCompleteServerTest1: Information: Close
+OriginalCompleteServerTest1: Information: Close
+OriginalCompleteServerTest1: Information: MemoryStream: Close - end data dump.
+OriginalCompleteServerTest1: Information: CompleteServer.ProcessOutQueuePackagesAsync : Package 13060495 sent.
+OriginalCompleteServerTest1: Trace: CompleteServer.SendBundleAsync: 
+OriginalCompleteServerTest1: Information: FileStream: Close - start data dump.
+OriginalCompleteServerTest1: Information: TarStream:
+OriginalCompleteServerTest1: Information: Close
+OriginalCompleteServerTest1: Information: Close
+OriginalCompleteServerTest1: Information: ZipStream:
+OriginalCompleteServerTest1: Information: FileStream: Close - end data dump.
+OriginalCompleteServerTest1: Information: FileStream: Close - start data dump.
+OriginalCompleteServerTest1: Information: TarStream:
+OriginalCompleteServerTest1: Information: Close
+OriginalCompleteServerTest1: Information: Close
+OriginalCompleteServerTest1: Information: ZipStream:
+OriginalCompleteServerTest1: Information: FileStream: Close - end data dump.
+OriginalCompleteServerTest1: Trace: Created Tar: TemporaryDirectory\33.TAR at 6/28/2021 1:00:00 AM
+OriginalCompleteServerTest1: Information: CompleteServer.SendBundleOutAsync: bundle file name: TemporaryDirectory\33.TAR
+OriginalCompleteServerTest1: Information: CompleteServer.SendBundleOutAsync: copied bundle to save: TemporaryDirectory\33.TAR.SENT
+OriginalCompleteServerTest1: Information: CompleteServer.SendBundleAsync: new bundle started 10101
+OriginalCompleteServerTest1: Trace: Test completed!

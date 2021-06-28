@@ -1,22 +1,21 @@
 ﻿namespace CompressionTests
 {
-    using Microsoft.Extensions.Logging;
-    using Stubs;
     using System;
     using System.Collections.Generic;
-    //using System.IO;
     using System.Linq;
     using System.Threading;
     using System.Threading.Tasks;
+    using Microsoft.Extensions.Logging;
+    using Stubs;
 
-    internal class CompleteServerStub
+    internal class RefactoredCompleteServerStub
     {
         // just for the nameof reference
-        public class CompleteServer { }
+        public class CompleteServer { } 
 
         public CancellationToken CancelToken { get; }
 
-        public CompleteServerStub(CancellationToken cancelToken, Action started)
+        public RefactoredCompleteServerStub(CancellationToken cancelToken, Action started)
         {
             CancelToken = cancelToken;
             _uowStub = new UowStub();

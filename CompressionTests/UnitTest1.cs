@@ -3,7 +3,6 @@
 namespace CompressionTests
 {
     using System;
-    using System.Text;
     using System.Threading;
     using System.Threading.Tasks;
     using ApprovalTests;
@@ -17,10 +16,10 @@ namespace CompressionTests
         public TestContext TestContext { get; set; }
 
         [TestMethod]
-        public async Task TestMethod1()
+        public async Task OriginalCompleteServerTest1()
         {
             var tokenSource = new CancellationTokenSource();
-            var loggerFake = new LoggerFake(nameof(TestMethod1));
+            var loggerFake = new LoggerFake(nameof(OriginalCompleteServerTest1));
             Stubs.Stream.Logger = (ILogger)loggerFake;
             var sut = new CompleteServerStub(tokenSource.Token, () => tokenSource.Cancel());
             sut.Logger = loggerFake;
@@ -33,36 +32,25 @@ namespace CompressionTests
             var output = loggerFake.LoggedData.ToString();
 
             Approvals.Verify(output);
-
-        }
-    }
-
-    public class LoggerFake : ILogger
-    {
-        private readonly string _logEntryHeader;
-
-        public LoggerFake(string logEntryHeader)
-        {
-            _logEntryHeader = string.IsNullOrEmpty(logEntryHeader) ? string.Empty : $"{logEntryHeader}: ";
-
-            LoggedData = new StringBuilder();
         }
 
-        public StringBuilder LoggedData { get; set; }
-
-        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+        [TestMethod]
+        public async Task RefactoredCompleteServerTest1()
         {
-            LoggedData.AppendLine($"{_logEntryHeader}{logLevel}: {formatter(state, exception)}");
-        }
+            var tokenSource = new CancellationTokenSource();
+            var loggerFake = new LoggerFake(nameof(OriginalCompleteServerTest1));
+            Stubs.Stream.Logger = (ILogger)loggerFake;
+            var sut = new RefactoredCompleteServerStub(tokenSource.Token, () => tokenSource.Cancel());
+            sut.Logger = loggerFake;
+            sut.CurrentDateTime = () => new DateTime(2021, 6, 28, 02, 0, 0);
 
-        public bool IsEnabled(LogLevel logLevel)
-        {
-            return true;
-        }
+            await sut.ExecuteAsync();
 
-        public IDisposable BeginScope<TState>(TState state)
-        {
-            throw new NotImplementedException();
+            loggerFake.LogTrace("Test completed!");
+
+            var output = loggerFake.LoggedData.ToString();
+
+            Approvals.Verify(output);
         }
     }
 }

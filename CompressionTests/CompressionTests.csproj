@@ -144,12 +144,18 @@
     <Compile Include="DocumentPackageQueue.cs" />
     <Compile Include="DocumentPage.cs" />
     <Compile Include="FileSystemHelperStub.cs" />
+    <Compile Include="LoggerFake.cs" />
     <Compile Include="QueueType.cs" />
+    <Compile Include="RefactoredCompleteServerStub.cs" />
     <Compile Include="SettingsStub.cs" />
     <Compile Include="Stubs\Stream.cs" />
+    <Compile Include="Stubs\TarEntry.cs" />
+    <Compile Include="Stubs\TarOutputStream.cs" />
     <Compile Include="UnitTest1.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="UowStub.cs" />
+    <Compile Include="Stubs\ZipEntry.cs" />
+    <Compile Include="Stubs\ZipOutputStream.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" />
