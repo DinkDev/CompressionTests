@@ -45,7 +45,7 @@
         // TODO: keep below, starting here:
 
         public CompressedFileHelper CompressedFileHelper { get; }
-
+        
         public ILogger Logger { get; set; }
         public Func<DateTime> CurrentDateTime { get; set; } = () => DateTime.Now;
         public DateTime LastProcessTime { get; set; }
@@ -54,9 +54,9 @@
         {
             LastProcessTime = CurrentDateTime();
 
-            // get the next vastec bundle
+            // get the next bundle to return
             Logger.LogTrace($"{nameof(CompleteServer)}.{nameof(ExecuteAsync)} - Starting at {CurrentDateTime()}");
-            var vastecBundle = await GetNextBundleAsync();
+            DocumentBundleReturned bundleToReturn = null;
             while (!CancelToken.IsCancellationRequested)
             {
                 try
@@ -65,13 +65,8 @@
                     var moreDocuments = true;
                     while (moreDocuments)
                     {
-                        (vastecBundle, moreDocuments) = await ProcessOutQueuePackagesAsync(vastecBundle, moreDocuments);
+                        (bundleToReturn, moreDocuments) = await ProcessOutQueuePackagesAsync(bundleToReturn);
                     }
-
-                    // TODO: the following never actually did anything
-                    //ProcessResendBundles();
-
-                    //ProcessResendPackages();
                 }
                 catch (Exception ex)
                 {
@@ -119,9 +114,11 @@
         }
 
         // was ProcessOutPackages
-        private async Task<Tuple<DocumentBundleReturned, bool>> ProcessOutQueuePackagesAsync(DocumentBundleReturned currentBundle, bool moreDocuments)
+        private async Task<Tuple<DocumentBundleReturned, bool>> ProcessOutQueuePackagesAsync(DocumentBundleReturned currentBundle)
         {
-            moreDocuments = false;
+            currentBundle = currentBundle ?? await GetNextBundleAsync();
+
+            var moreDocuments = false;
 
             DocumentPackage package = null;
             var documents = new List<Document>();
@@ -158,7 +155,7 @@
                         Logger.LogDebug($"{nameof(CompleteServer)}.{nameof(ProcessOutQueuePackagesAsync)}: Starting bundle ID: {currentBundle.Id}, Timeout: {LastProcessTime}");
 
                         // validate we have what we need
-                        if (!ValidateDocs(documents, out var errorFileName))
+                        if (!ValidateDocuments(documents, out var errorFileName))
                         {
                             // mark for error and send to error queue
                             package.SetRecordStatusErrored();
@@ -350,17 +347,6 @@
             return rv;
         }
 
-        private bool ValidateXml(DocumentPackage package)
-        {
-            return true;
-        }
-
-        private bool ValidateDocs(List<Document> documents, out string errorFileName)
-        {
-            errorFileName = "Unknown";
-            return true;
-        }
-
         public async Task<bool> SendBundleOutAsync(DocumentBundleReturned bundle)
         {
             try
@@ -532,6 +518,19 @@
         }
 
         #region Noops
+
+
+
+        private bool ValidateXml(DocumentPackage package)
+        {
+            return true;
+        }
+
+        private bool ValidateDocuments(List<Document> documents, out string errorFileName)
+        {
+            errorFileName = "Unknown";
+            return true;
+        }
 
         private bool BundleLimit(DocumentBundleReturned currentBundle, int packageReturnedFileSize)
         {
