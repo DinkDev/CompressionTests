@@ -37,10 +37,14 @@
             _uowStub = new UowStub();
 
             _uowStub.Started += started;
+
+            CompressedFileHelper = new CompressedFileHelper(FileSystemHelper);
         }
 
 
         // TODO: keep below, starting here:
+
+        public CompressedFileHelper CompressedFileHelper { get; }
 
         public ILogger Logger { get; set; }
         public Func<DateTime> CurrentDateTime { get; set; } = () => DateTime.Now;
@@ -415,7 +419,17 @@
 
             var zipData = GetPackageFilesForZip(package);
 
-            var packageBytes = await CompressedFileHelper_GetZipBytes(zipData);
+            var packageBytes = new byte[]{};
+
+            try
+            {
+                packageBytes = await CompressedFileHelper.GetZipBytes(zipData);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, $"{nameof(CompleteServer)}.{nameof(ZipPackageAsync)}");
+            }
+
             if (packageBytes.Length > 0)
             {
                 package.ReturnedFileSize = Convert.ToInt32(packageBytes.Length);
@@ -430,9 +444,9 @@
             return rv;
         }
 
-        public IEnumerable<CompressedEntry> GetPackageFilesForZip(DocumentPackage package)
+        public IEnumerable<CompressedFileEntry> GetPackageFilesForZip(DocumentPackage package)
         {
-            var rv = new List<CompressedEntry>();
+            var rv = new List<CompressedFileEntry>();
 
             foreach (var document in package.Documents)
             {
@@ -442,7 +456,7 @@
                         document.DocumentData.Single(d => d.DataType == DocumentDataType.TransformData);
                     var documentBaseFileName = FileSystemHelper.GetFileNameWithoutExtension(document.FileName);
 
-                    rv.Add(new CompressedEntry
+                    rv.Add(new CompressedFileEntry
                     {
                         SourceFileName = outputXmlFile.DataFileName,
 
@@ -459,7 +473,7 @@
                             var svgFileName = FileSystemHelper.CombinePath(documentBaseFileName,
                                 FileSystemHelper.GetFileName(svgFile.DataFileName));
 
-                            rv.Add(new CompressedEntry
+                            rv.Add(new CompressedFileEntry
                             {
                                 SourceFileName = svgFile.DataFileName,
                                 TargetFileName = ReplaceUnderscoreWith2E(svgFileName),
@@ -477,91 +491,16 @@
             return rv;
         }
 
-        public async Task<byte[]> CompressedFileHelper_GetZipBytes(IEnumerable<CompressedEntry> zipDataList)
-        {
-            var outStream = new MemoryStream();
-            using (var zipStream = new ZipOutputStream(outStream))
-            {
-                zipStream.SetLevel(3);
-                foreach (var zipData in zipDataList)
-                {
-                    try
-                    {
-                        var zipDataBytes = await FileSystemHelper.ReadAllBytesAsync(zipData.SourceFileName);
-
-                        var zipEntry = new ZipEntry(zipData.TargetFileName)
-                            {
-                                DateTime = zipData.TargetFileDate,
-                                Size = zipDataBytes.Length
-                            };
-                        zipStream.PutNextEntry(zipEntry);
-                        zipStream.Write(zipDataBytes, 0, zipDataBytes.Length);
-                        zipStream.CloseEntry();
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogError(ex, $"{nameof(CompleteServer)}.{nameof(ZipPackageAsync)}");
-                    }
-                }
-
-                zipStream.IsStreamOwner = false;
-                zipStream.Close();
-            }
-
-            outStream.Position = 0;
-            var zippedData = outStream.ToArray();
-            outStream.Close();
-
-            return zippedData;
-        }
-
         public void TarPackages(string sourceDir, string targetFileName)
         {
             var zipFiles = FileSystemHelper.GetFilesRecursive(sourceDir, "*.ZIP");
-            CompressedFileHelper_CreateTarFromFileList(targetFileName, zipFiles);
+            CompressedFileHelper.CreateTarFromFileList(targetFileName, zipFiles);
 
             Logger.LogTrace($"Created Tar: {targetFileName} at {CurrentDateTime()}");
             FileSystemHelper.CleanUp(sourceDir);
         }
 
-        private void CompressedFileHelper_CreateTarFromFileList(string tarFileName, IEnumerable<string> files)
-        {
-            using (var outStream = new FileStream(tarFileName, FileMode.Create))
-            {
-                using (var tarStream = new TarOutputStream(outStream))
-                {
-                    foreach (var file in files)
-                    {
-                        using (var inputStream = File.OpenRead(file))
-                        {
-                            var tarName = FileSystemHelper.GetFileName(file);
-                            var fileSize = inputStream.Length;
-                            var tarEntry = TarEntry.CreateTarEntry(tarName);
-                            tarEntry.Size = fileSize;
-                            tarStream.PutNextEntry(tarEntry);
 
-                            var localBuffer = new byte[32 * 1024];
-                            while (true)
-                            {
-                                var numRead = inputStream.Read(localBuffer, 0, localBuffer.Length);
-                                if (numRead <= 0)
-                                {
-                                    break;
-                                }
-
-                                tarStream.Write(localBuffer, 0, numRead);
-                            }
-
-                            tarStream.CloseEntry();
-                        }
-                    }
-
-                    tarStream.Close();
-                }
-
-                outStream.Close();
-            }
-        }
 
         public string ReplaceUnderscoreWith2E(string fileName)
         {
@@ -607,10 +546,91 @@
         #endregion
     }
 
-    internal class CompressedEntry
+    internal class CompressedFileEntry
     {
         public string SourceFileName { get; set; }
         public string TargetFileName { get; set; }
         public DateTime TargetFileDate { get; set; }
+    }
+
+    internal class CompressedFileHelper
+    {
+        public FileSystemHelperStub FileSystemHelper { get; }
+
+        public CompressedFileHelper(FileSystemHelperStub fileSystemHelper)
+        {
+            FileSystemHelper = fileSystemHelper;
+        }
+
+        public async Task<byte[]> GetZipBytes(IEnumerable<CompressedFileEntry> zipDataList)
+        {
+            var outStream = new MemoryStream();
+            using (var zipStream = new ZipOutputStream(outStream))
+            {
+                zipStream.SetLevel(3);
+                foreach (var zipData in zipDataList)
+                {
+
+                    var zipDataBytes = await FileSystemHelper.ReadAllBytesAsync(zipData.SourceFileName);
+
+                    var zipEntry = new ZipEntry(zipData.TargetFileName)
+                    {
+                        DateTime = zipData.TargetFileDate,
+                        Size = zipDataBytes.Length
+                    };
+                    zipStream.PutNextEntry(zipEntry);
+                    zipStream.Write(zipDataBytes, 0, zipDataBytes.Length);
+                    zipStream.CloseEntry();
+                }
+
+                zipStream.IsStreamOwner = false;
+                zipStream.Close();
+            }
+
+            outStream.Position = 0;
+            var zippedData = outStream.ToArray();
+            outStream.Close();
+
+            return zippedData;
+        }
+
+        public void CreateTarFromFileList(string tarFileName, IEnumerable<string> files)
+        {
+            using (var outStream = new FileStream(tarFileName, FileMode.Create))
+            {
+                using (var tarStream = new TarOutputStream(outStream))
+                {
+                    foreach (var file in files)
+                    {
+                        using (var inputStream = File.OpenRead(file))
+                        {
+                            var tarName = FileSystemHelper.GetFileName(file);
+                            var fileSize = inputStream.Length;
+                            var tarEntry = TarEntry.CreateTarEntry(tarName);
+                            tarEntry.Size = fileSize;
+                            tarStream.PutNextEntry(tarEntry);
+
+                            var localBuffer = new byte[32 * 1024];
+                            while (true)
+                            {
+                                var numRead = inputStream.Read(localBuffer, 0, localBuffer.Length);
+                                if (numRead <= 0)
+                                {
+                                    break;
+                                }
+
+                                tarStream.Write(localBuffer, 0, numRead);
+                            }
+
+                            tarStream.CloseEntry();
+                        }
+                    }
+
+                    tarStream.Close();
+                }
+
+                outStream.Close();
+            }
+        }
     }
 }
