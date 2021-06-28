@@ -28,7 +28,7 @@
         public SettingsStub Settings { get; } = new SettingsStub();
 
         public ILogger Logger { get; set; }
-        public Func<DateTime> CurrentDateTime => () => DateTime.Now;
+        public Func<DateTime> CurrentDateTime { get; set; } = () => DateTime.Now;
 
         public DateTime LastProcessTime { get; set; }
 
@@ -452,7 +452,7 @@
                                 ReplaceUnderscoreWith2E(FileSystemHelper.CombinePath(documentBaseFileName,
                                     $"{documentBaseFileName}.XML")))
                             {
-                                DateTime = DateTime.Now,
+                                DateTime = CurrentDateTime(),
                                 Size = xmlData.Length
                             };
                         zipStream.PutNextEntry(zipEntry);

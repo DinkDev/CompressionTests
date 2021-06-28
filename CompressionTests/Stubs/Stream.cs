@@ -2,17 +2,17 @@
 {
     using System;
     using System.Text;
-    using Microsoft.VisualStudio.TestTools.UnitTesting;
+    using Microsoft.Extensions.Logging;
 
     internal class Stream : IDisposable
     {
-        public static TestContext TestContext { get; set; }
-
         public string FileName { get; protected set; }
         public int Position { get; set; }
         public int Length { get; set; } = 4000;
         public ZipOutputStream ZipStream { get; set; }
         public TarOutputStream TarStream { get; set; }
+
+        public static ILogger Logger { get; set; }
 
         public int Read(byte[] output, int start, int end)
         {
@@ -33,15 +33,15 @@
 
         public void Close()
         {
-            TestContext.WriteLine($"{GetType().Name}: {nameof(Close)} - start data dump.");
+            Logger.LogInformation($"{GetType().Name}: {nameof(Close)} - start data dump.");
 
-            TestContext.WriteLine($"{nameof(TarStream)}:");
-            TarStream?.State.ForEach(t => TestContext.WriteLine(t));
+            Logger.LogInformation($"{nameof(TarStream)}:");
+            TarStream?.State.ForEach(t => Logger.LogInformation(t));
 
-            TestContext.WriteLine($"{nameof(ZipStream)}:");
-            ZipStream?.State.ForEach(z => TestContext.WriteLine(z));
+            Logger.LogInformation($"{nameof(ZipStream)}:");
+            ZipStream?.State.ForEach(z => Logger.LogInformation(z));
 
-            TestContext.WriteLine($"{GetType().Name}: {nameof(Close)} - end data dump.");
+            Logger.LogInformation($"{GetType().Name}: {nameof(Close)} - end data dump.");
         }
 
         public void Dispose()
