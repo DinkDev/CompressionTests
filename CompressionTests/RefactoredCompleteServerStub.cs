@@ -187,8 +187,8 @@
                             }
                         }
 
-                        var packageBytes = await ZipPackageAsync(package);
-                        if (packageBytes.Length == 0)
+                        var zippedOk = await ZipPackageAsync(package);
+                        if (!zippedOk)
                         {
                             var errorMessage = $"Unable to complete create package: {package.PackageName}, no data Zipped";
                             Logger.LogError(errorMessage);
@@ -231,12 +231,6 @@
                                     }
                                 }
                             }
-
-                            package.ReturnedFileSize = Convert.ToInt32(packageBytes.Length);
-                            package.ReturnedFileChecksum = ChecksumHelper.Compute(packageBytes);
-
-                            // save to work dir
-                            await WritePackageWorkFileAsync(package, packageBytes);
 
                             Logger.LogInformation(
                                 $"{nameof(CompleteServer)}.{nameof(ProcessOutQueuePackagesAsync)} : Package {package.PackageName} sent.");
@@ -427,58 +421,94 @@
 
         public FileSystemHelperStub FileSystemHelper { get; } = new FileSystemHelperStub();
 
-        /// <remarks>
-        /// Caller should dispose of MemoryStream returned
-        /// </remarks>
-        public async Task<byte[]> ZipPackageAsync(DocumentPackage package)
+        public async Task<bool> ZipPackageAsync(DocumentPackage package)
+        {
+            var rv = false;
+
+            var zipData = ZipPackage_DocumentPart(package);
+
+            var packageBytes = await ZipPackage_ZipPartAsync(zipData);
+            if (packageBytes.Length > 0)
+            {
+                package.ReturnedFileSize = Convert.ToInt32(packageBytes.Length);
+                package.ReturnedFileChecksum = ChecksumHelper.Compute(packageBytes);
+
+                // save to work dir
+                await WritePackageWorkFileAsync(package, packageBytes);
+
+                rv = true;
+            }
+
+            return rv;
+        }
+
+        public IEnumerable<CompressedEntry> ZipPackage_DocumentPart(DocumentPackage package)
+        {
+            var rv = new List<CompressedEntry>();
+
+            foreach (var document in package.Documents)
+            {
+                try
+                {
+                    var outputXmlFile =
+                        document.DocumentData.Single(d => d.DataType == DocumentDataType.TransformData);
+                    var documentBaseFileName = FileSystemHelper.GetFileNameWithoutExtension(document.FileName);
+
+                    rv.Add(new CompressedEntry
+                    {
+                        SourceFileName = outputXmlFile.DataFileName,
+
+                        TargetFileName = ReplaceUnderscoreWith2E(
+                            FileSystemHelper.CombinePath(documentBaseFileName, $"{documentBaseFileName}.XML")),
+                        TargetFileDate = CurrentDateTime()
+                    });
+
+                    foreach (var page in document.DocumentPages.OrderBy(p => p.PageNumber))
+                    {
+                        foreach (var svgFile in
+                            page.DocumentData.Where(d => d.DataType == DocumentDataType.SvgData))
+                        {
+                            var svgFileName = FileSystemHelper.CombinePath(documentBaseFileName,
+                                FileSystemHelper.GetFileName(svgFile.DataFileName));
+
+                            rv.Add(new CompressedEntry
+                            {
+                                SourceFileName = svgFile.DataFileName,
+                                TargetFileName = ReplaceUnderscoreWith2E(svgFileName),
+                                TargetFileDate = CurrentDateTime()
+                            });
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, $"{nameof(CompleteServer)}.{nameof(ZipPackageAsync)}");
+                }
+            }
+
+            return rv;
+        }
+
+        public async Task<byte[]> ZipPackage_ZipPartAsync(IEnumerable<CompressedEntry> zipDataList)
         {
             var outStream = new MemoryStream();
             using (var zipStream = new ZipOutputStream(outStream))
             {
                 zipStream.SetLevel(3);
-                foreach (var document in package.Documents)
+                foreach (var zipData in zipDataList)
                 {
                     try
                     {
-                        var outputXmlFile =
-                            document.DocumentData.Single(d => d.DataType == DocumentDataType.TransformData);
-                        var documentBaseFileName = FileSystemHelper.GetFileNameWithoutExtension(document.FileName);
+                        var zipDataBytes = await FileSystemHelper.ReadAllBytesAsync(zipData.SourceFileName);
 
-                        var xmlData = await FileSystemHelper.ReadAllBytesAsync(outputXmlFile.DataFileName);
-                        var zipEntry =
-                            new ZipEntry(
-                                ReplaceUnderscoreWith2E(FileSystemHelper.CombinePath(documentBaseFileName,
-                                    $"{documentBaseFileName}.XML")))
+                        var zipEntry = new ZipEntry(zipData.TargetFileName)
                             {
-                                DateTime = CurrentDateTime(),
-                                Size = xmlData.Length
+                                DateTime = zipData.TargetFileDate,
+                                Size = zipDataBytes.Length
                             };
                         zipStream.PutNextEntry(zipEntry);
-                        zipStream.Write(xmlData, 0, xmlData.Length);
+                        zipStream.Write(zipDataBytes, 0, zipDataBytes.Length);
                         zipStream.CloseEntry();
-
-                        foreach (var page in document.DocumentPages.OrderBy(p => p.PageNumber))
-                        {
-                            foreach (var svgFile in
-                                page.DocumentData.Where(d => d.DataType == DocumentDataType.SvgData))
-                            {
-                                var svgFileName = FileSystemHelper.CombinePath(documentBaseFileName,
-                                    FileSystemHelper.GetFileName(svgFile.DataFileName));
-                                var svgData = await FileSystemHelper.ReadAllBytesAsync(svgFileName);
-
-                                var fileName = ReplaceUnderscoreWith2E(svgFileName);
-
-                                var svgEntry = new ZipEntry(fileName)
-                                {
-                                    DateTime = CurrentDateTime(),
-                                    Size = svgData.Length
-                                };
-
-                                zipStream.PutNextEntry(svgEntry);
-                                zipStream.Write(svgData, 0, svgData.Length);
-                                zipStream.CloseEntry();
-                            }
-                        }
                     }
                     catch (Exception ex)
                     {
@@ -491,10 +521,10 @@
             }
 
             outStream.Position = 0;
-            var zipData = outStream.ToArray();
+            var zippedData = outStream.ToArray();
             outStream.Close();
 
-            return zipData;
+            return zippedData;
         }
 
         public void TarPackages(string sourceDir, string targetFileName)
@@ -540,8 +570,6 @@
             FileSystemHelper.CleanUp(sourceDir);
         }
 
-
-
         public string ReplaceUnderscoreWith2E(string instr)
         {
             var ret = instr.Replace("_", "+2e");
@@ -572,5 +600,12 @@
                     bundle.Id + Settings.BundleFileExtension);
             }
         }
+    }
+
+    internal class CompressedEntry
+    {
+        public string SourceFileName { get; set; }
+        public string TargetFileName { get; set; }
+        public DateTime TargetFileDate { get; set; }
     }
 }
